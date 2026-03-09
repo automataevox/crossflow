@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>CrossFlow</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.crossflow.mac</string>
+    <key>CFBundleName</key>
+    <string>CrossFlow</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+    <!-- Hide from Dock, show in menu bar only -->
+    <key>LSUIElement</key>
+    <true/>
+    <!-- Bonjour services declaration (required for sandboxed apps) -->
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_crossflow._tcp</string>
+    </array>
+    <!-- Local network usage description (macOS 12+) -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>CrossFlow uses your local network to sync the clipboard between your devices.</string>
+</dict>
+</plist>

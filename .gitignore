@@ -1,0 +1,88 @@
+# Build directories
+build/
+dist/
+out/
+bin/
+*.class
+*.jar
+*.war
+*.aar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+ehthumbs.db
+Desktop.ini
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Local properties
+local.properties
+keystore.properties
+
+# Android
+android/local.properties
+android/.gradle/
+android/build/
+
+# Kotlin
+*.log
+*.ktc
+.kotlin/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Node (if used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# macOS
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+.swiftpm/
+
+# Windows
+*.exe
+*.ps1
+*.pdb
+Thumbs.db
+
+# Misc
+*.swp
+*.swo
+*~
+.tmp/
+temp/
+.DS_Store
+.env
+.env.local
+
+# java
+*.hprof
