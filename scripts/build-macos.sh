@@ -49,7 +49,7 @@ codesign --deep --force --verify --verbose --sign - "$APP_BUNDLE" 2>/dev/null ||
 
 # Create DMG (disk image) for distribution
 echo "Creating DMG distribution package..."
-DMG_OUTPUT="$BUILD_DIR/CrossFlow-1.0.0.dmg"
+DMG_OUTPUT="$BUILD_DIR/CrossFlow-1.1.0.dmg"
 
 # Clean up any existing DMG
 [ -f "$DMG_OUTPUT" ] && rm "$DMG_OUTPUT"
@@ -73,6 +73,6 @@ echo "To run the app:"
 echo "  open $APP_BUNDLE"
 echo ""
 echo "To distribute:"
-echo "  - Zip: ditto -c -k --sequesterRsrc $APP_BUNDLE CrossFlow-1.0.0.zip"
+echo "  - Zip: ditto -c -k --sequesterRsrc $APP_BUNDLE CrossFlow-1.1.0.zip"
 echo "  - DMG: $DMG_OUTPUT"
 echo ""

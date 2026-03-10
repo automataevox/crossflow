@@ -1,12 +1,48 @@
 import AppKit
 import Network
 import Foundation
+import os.log
+
+// MARK: - Logger
+let logger = Logger(subsystem: "dev.crossflow.macos", category: "main")
+
+// Debug file logger (since os_log isn't appearing)
+func debugLog(_ message: String) {
+    let timestamp = Date().timeIntervalSince1970
+    let logMessage = "[\(timestamp)] \(message)\n"
+    if let data = logMessage.data(using: .utf8) {
+        let fileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("crossflow-debug.log")
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
+                fileHandle.seekToEndOfFile()
+                fileHandle.write(data)
+                fileHandle.closeFile()
+            }
+        } else {
+            try? data.write(to: fileURL)
+        }
+    }
+}
 
 // MARK: - Protocol
 struct ClipMessage: Codable {
     let type: String
     let content: String
     let source: String
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decodeIfPresent(String.self, forKey: .type) ?? "clipboard"
+        self.content = try container.decode(String.self, forKey: .content)
+        self.source = try container.decode(String.self, forKey: .source)
+    }
+    
+    init(type: String = "clipboard", content: String, source: String) {
+        self.type = type
+        self.content = content
+        self.source = source
+    }
 }
 
 enum Protocol {
@@ -19,8 +55,26 @@ enum Protocol {
     }
     
     static func decode(_ data: Data) -> ClipMessage? {
-        guard let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
-        return try? JSONDecoder().decode(ClipMessage.self, from: Data(str.utf8))
+        guard let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            debugLog("[Protocol] UTF-8 conversion failed")
+            logger.error("[Protocol] ✗ Failed to convert data to UTF-8 string")
+            return nil
+        }
+        
+        debugLog("[Protocol] Decoding: '\(str)'")
+        logger.info("[Protocol] Attempting to decode: '\(str)'")
+        
+        do {
+            let msg = try JSONDecoder().decode(ClipMessage.self, from: Data(str.utf8))
+            debugLog("[Protocol] Success: type=\(msg.type)")
+            logger.info("[Protocol] ✓ Decode success: type=\(msg.type), source=\(msg.source)")
+            return msg
+        } catch {
+            debugLog("[Protocol] JSON error: \(error)")
+            logger.error("[Protocol] ✗ JSON decode error: \(error)")
+            logger.error("[Protocol] ✗ Failed string: '\(str)'")
+            return nil
+        }
     }
 }
 
@@ -87,16 +141,17 @@ class TCPServer {
                 switch state {
                 case .ready:
                     if let port = self?.listener?.port {
-                        print("[TCP] ✓ Server listening on port \(port)")
+                        debugLog("[TCP] Server listening on port \(port)")
+                        logger.info("[TCP] ✓ Server listening on port \(String(describing: port))")
                         self?.onDebugLog?("✅ TCP server on :\(port)")
                     }
                 case .failed(let error):
-                    print("[TCP] ✗ Server failed: \(error)")
+                    logger.error("[TCP] ✗ Server failed: \(error)")
                     self?.onDebugLog?("❌ TCP failed: \(error)")
                 case .cancelled:
-                    print("[TCP] Server cancelled")
+                    logger.info("[TCP] Server cancelled")
                 default:
-                    print("[TCP] Server state: \(state)")
+                    logger.debug("[TCP] Server state: \(String(describing: state))")
                 }
             }
             listener?.newConnectionHandler = { [weak self] conn in
@@ -104,7 +159,7 @@ class TCPServer {
             }
             listener?.start(queue: queue)
         } catch {
-            print("[TCP] ✗ Failed to start: \(error)")
+            logger.error("[TCP] ✗ Failed to start: \(error)")
         }
     }
     
@@ -114,12 +169,14 @@ class TCPServer {
     
     private func handle(_ conn: NWConnection) {
         let endpoint = conn.endpoint
-        print("[TCP] 📥 New connection from \(endpoint)")
+        let endpointStr = String(describing: endpoint)
+        debugLog("[TCP] New connection from \(endpointStr)")
+        logger.info("[TCP] 📥 New connection from \(endpointStr)")
         onDebugLog?("📥 Connection from \(endpoint)")
         
         conn.stateUpdateHandler = { [weak self] state in
             if case .failed(let error) = state {
-                print("[TCP] Connection error: \(error)")
+                logger.error("[TCP] Connection error: \(error)")
                 self?.onDebugLog?("❌ Conn error: \(error)")
             }
         }
@@ -127,18 +184,33 @@ class TCPServer {
         conn.start(queue: queue)
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             if let error = error {
-                print("[TCP] ✗ Receive error: \(error)")
+                logger.error("[TCP] ✗ Receive error: \(error)")
                 conn.cancel()
                 return
             }
             
             if let data = data, !data.isEmpty {
-                print("[TCP] Received \(data.count) bytes from \(endpoint)")
+                debugLog("[TCP] Received \(data.count) bytes")
+                logger.info("[TCP] Received \(data.count) bytes from \(endpointStr)")
+                let hexDump = data.map { String(format: "%02x", $0) }.joined(separator: " ")
+                debugLog("[TCP] Hex: \(hexDump)")
+                logger.info("[TCP] Raw hex: \(hexDump)")
+                if let rawString = String(data: data, encoding: .utf8) {
+                    debugLog("[TCP] String: '\(rawString)'")
+                    logger.info("[TCP] Raw string: '\(rawString)'")
+                    logger.info("[TCP] Raw string (escaped): \(rawString.debugDescription)")
+                } else {
+                    debugLog("[TCP] Not valid UTF-8")
+                    logger.warning("[TCP] ⚠️ Not valid UTF-8 data")
+                }
                 if let msg = Protocol.decode(data) {
-                    print("[TCP] ✓ Decoded message from '\(msg.source)': \(msg.content.prefix(40))...")
+                    debugLog("[TCP] Decoded: type=\(msg.type) from=\(msg.source)")
+                    logger.info("[TCP] ✓ Decoded message from '\(msg.source)': '\(msg.content)'")
                     self?.onMessage?(msg)
                 } else {
-                    print("[TCP] ✗ Failed to decode message")
+                    debugLog("[TCP] Decode FAILED")
+                    logger.error("[TCP] ✗ Failed to decode message")
+                    self?.onDebugLog?("❌ Decode failed")
                 }
             }
             
@@ -192,10 +264,142 @@ class BonjourService: NSObject, NetServiceDelegate, NetServiceBrowserDelegate {
     private func startUdpDiscovery() {
         // Start broadcasting immediately
         startBroadcasting()
+        
+        // Start listening for UDP broadcasts
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            self?.listenForUdpBroadcasts()
+        }
+        
         onDebugLog?("📡 UDP discovery started")
     }
     
-
+    private func listenForUdpBroadcasts() {
+        print("[UDP] Creating socket...")
+        let sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        guard sock >= 0 else {
+            let err = errno
+            let errMsg = String(cString: strerror(err))
+            print("[UDP] ⚠️ Socket creation failed: errno \(err) - \(errMsg)")
+            DispatchQueue.main.async { [weak self] in
+                self?.onDebugLog?("⚠️ UDP socket failed: \(err) - \(errMsg)")
+            }
+            return
+        }
+        
+        print("[UDP] Socket created successfully (fd \(sock))")
+        
+        // Set socket options
+        var yes: Int32 = 1
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+        setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &yes, socklen_t(MemoryLayout<Int32>.size))
+        setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &yes, socklen_t(MemoryLayout<Int32>.size))
+        
+        print("[UDP] Socket options set")
+        
+        // Bind to port 35647
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = UInt16(Protocol.port).bigEndian
+        addr.sin_addr.s_addr = INADDR_ANY
+        
+        print("[UDP] Attempting to bind to 0.0.0.0:35647...")
+        
+        let bindResult = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        
+        guard bindResult == 0 else {
+            let err = errno
+            let errMsg = String(cString: strerror(err))
+            print("[UDP] ⚠️ Bind failed: errno \(err) - \(errMsg)")
+            close(sock)
+            DispatchQueue.main.async { [weak self] in
+                self?.onDebugLog?("⚠️ UDP bind failed: \(err) - \(errMsg)")
+            }
+            return
+        }
+        
+        print("[UDP] ✅ Successfully bound to :35647, listening for broadcasts...")
+        DispatchQueue.main.async { [weak self] in
+            self?.onDebugLog?("✅ UDP listener ACTIVE on :35647")
+        }
+        
+        // Listen for broadcasts
+        var buffer = [UInt8](repeating: 0, count: 512)
+        var messageCount = 0
+        var loopCount = 0
+        while true {
+            loopCount += 1
+            if loopCount % 100 == 1 {
+                print("[UDP] recvfrom() loop iteration #\(loopCount), waiting for packet...")
+            }
+            
+            var senderAddr = sockaddr_in()
+            var senderLen = socklen_t(MemoryLayout<sockaddr_in>.size)
+            
+            print("[UDP] Calling recvfrom()...")
+            let recvLen = withUnsafeMutablePointer(to: &senderAddr) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    recvfrom(sock, &buffer, buffer.count, 0, $0, &senderLen)
+                }
+            }
+            print("[UDP] recvfrom() returned: \(recvLen)")
+            
+            guard recvLen > 0 else {
+                let err = errno
+                if err != EAGAIN && err != EWOULDBLOCK {
+                    print("[UDP] recvfrom error: errno \(err) - \(String(cString: strerror(err)))")
+                }
+                continue
+            }
+            
+            messageCount += 1
+            
+            guard let message = String(bytes: buffer[0..<recvLen], encoding: .utf8) else {
+                print("[UDP] Failed to decode message #\(messageCount)")
+                continue
+            }
+            
+            print("[UDP] 📥 Message #\(messageCount): '\(message)'")
+            
+            // Parse: CROSSFLOW:DeviceName:Port
+            let parts = message.components(separatedBy: ":")
+            if parts.count >= 3 && parts[0] == "CROSSFLOW" {
+                let peerName = parts[1]
+                let portStr = parts[2]
+                
+                print("[UDP] Parsed: name='\(peerName)' port='\(portStr)'")
+                
+                guard peerName != self.deviceName, let port = Int(portStr) else {
+                    print("[UDP] Ignoring (self or invalid port)")
+                    continue
+                }
+                
+                // Convert sender IP to string
+                var hostBuffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+                inet_ntop(AF_INET, &senderAddr.sin_addr, &hostBuffer, socklen_t(INET_ADDRSTRLEN))
+                let senderIP = String(cString: hostBuffer)
+                
+                print("[UDP] ✅ Valid peer: '\(peerName)' @ \(senderIP):\(port)")
+                
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    if self.peers[peerName] == nil {
+                        print("[UDP] Adding new peer '\(peerName)' to dictionary")
+                        self.peers[peerName] = (senderIP, port)
+                        self.onPeerFound?(peerName)
+                        self.onDebugLog?("✅ UDP: Found '\(peerName)' @ \(senderIP)")
+                    } else {
+                        print("[UDP] Peer '\(peerName)' already known")
+                    }
+                }
+            } else {
+                print("[UDP] Message doesn't match protocol: '\(message)'")
+            }
+        }
+    }
     
     private func startBroadcasting() {
         // Send broadcasts every 5 seconds
@@ -209,14 +413,23 @@ class BonjourService: NSObject, NetServiceDelegate, NetServiceBrowserDelegate {
         let message = "CROSSFLOW:\(deviceName):\(Protocol.port)"
         guard let data = message.data(using: .utf8) else { return }
         
-        // Broadcast to 255.255.255.255
-        let endpoint = NWEndpoint.hostPort(host: "255.255.255.255", port: NWEndpoint.Port(rawValue: Protocol.port)!)
-        let connection = NWConnection(to: endpoint, using: .udp)
+        // Broadcast to multiple addresses for better compatibility
+        let broadcastAddresses = ["255.255.255.255", "10.0.1.255"]
         
-        connection.start(queue: .global())
-        connection.send(content: data, completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        for address in broadcastAddresses {
+            let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(address), port: NWEndpoint.Port(rawValue: Protocol.port)!)
+            let connection = NWConnection(to: endpoint, using: .udp)
+            
+            connection.start(queue: .global())
+            connection.send(content: data, completion: .contentProcessed { error in
+                if let error = error {
+                    print("[UDP] Broadcast to \(address) failed: \(error)")
+                } else {
+                    print("[UDP] ✓ Broadcast sent to \(address)")
+                }
+                connection.cancel()
+            })
+        }
     }
     
     func broadcast(_ text: String, from source: String) {
@@ -354,28 +567,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var bonjour: BonjourService!
     var peers: [String] = []
     var debugLog: [String] = []
-    
-    func appendDebugLog(_ message: String) {
-        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        debugLog.append("[\(timestamp)] \(message)")
-        if debugLog.count > 20 { debugLog.removeFirst() }
-        if popover != nil && deviceName != nil {
-            updatePopover()
-        }
-    }
+    var clipboardHistory: [String] = []
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         deviceName = Host.current().localizedName?.replacingOccurrences(of: " ", with: "_") ?? "Mac"
-        
-        appendDebugLog("🚀 CrossFlow started")
-        appendDebugLog("📱 Device: \(deviceName)")
-        
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("CrossFlow macOS - Starting")
-        print("Device Name: \(deviceName)")
-        print("Protocol: \(Protocol.serviceType)")
-        print("Port: \(Protocol.port)")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         // Status bar setup
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -384,7 +579,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.action = #selector(togglePopover)
             button.target = self
         }
-        print("[UI] Status bar icon created")
         
         // Popover
         popover = NSPopover()
@@ -397,14 +591,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         tcpServer.onMessage = { [weak self] msg in
             guard let self = self, msg.source != self.deviceName else { return }
             DispatchQueue.main.async {
-                print("[App] 📥 Received clipboard from '\(msg.source)'")
-                self.appendDebugLog("📥 Recv from '\(msg.source)'")
-                self.clipboard.write(msg.content)
-            }
-        }
-        tcpServer.onDebugLog = { [weak self] message in
-            DispatchQueue.main.async {
-                self?.appendDebugLog(message)
+                // Filter out peer_announce messages (Windows keep-alive)
+                if msg.type == "peer_announce" {
+                    print("[App] 📡 Peer announce from '\(msg.source)': \(msg.content)")
+                    return
+                }
+                
+                // Only write clipboard messages to clipboard
+                if msg.type == "clipboard" {
+                    print("[App] 📥 Received clipboard from '\(msg.source)': '\(msg.content)'")
+                    self.clipboard.write(msg.content)
+                } else {
+                    print("[App] ⚠️ Unknown message type '\(msg.type)' from '\(msg.source)'")
+                }
             }
         }
         tcpServer.start()
@@ -414,18 +613,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         bonjour.onPeerFound = { [weak self] name in
             DispatchQueue.main.async {
                 self?.peers.append(name)
-                self?.appendDebugLog("🎉 Peer found: '\(name)'")
             }
         }
         bonjour.onPeerLost = { [weak self] name in
             DispatchQueue.main.async {
                 self?.peers.removeAll { $0 == name }
-                self?.appendDebugLog("👋 Peer lost: '\(name)'")
-            }
-        }
-        bonjour.onDebugLog = { [weak self] message in
-            DispatchQueue.main.async {
-                self?.appendDebugLog(message)
             }
         }
         bonjour.start()
@@ -433,15 +625,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Clipboard
         clipboard = ClipboardMonitor { [weak self] text in
             guard let self = self else { return }
-            print("[App] 📤 Local clipboard changed, broadcasting to \(self.peers.count) peer(s)")
+            print("[App] 📤 Local clipboard changed: '\(text)'")
+            print("[App] 📤 Broadcasting to \(self.peers.count) peer(s)")
             self.bonjour.broadcast(text, from: self.deviceName)
         }
         clipboard.start()
-        
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("✓ CrossFlow is running!")
-        print("Look for the icon in your menu bar")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
     }
     
     @objc func togglePopover() {
@@ -478,14 +667,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Status
         let status = NSTextField(labelWithString: "● Active")
         status.font = .systemFont(ofSize: 11)
-        status.textColor = .systemGreen
         stack.addArrangedSubview(status)
-        
-        stack.addArrangedSubview(separator())
-        
-        // Device
-        stack.addArrangedSubview(label("This Device", size: 10, color: .secondaryLabelColor))
-        stack.addArrangedSubview(label(deviceName.replacingOccurrences(of: "_", with: " "), size: 13))
         
         stack.addArrangedSubview(separator())
         
@@ -497,7 +679,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             for peer in peers {
                 let peerLabel = NSTextField(labelWithString: "● \(peer.replacingOccurrences(of: "_", with: " "))")
                 peerLabel.font = .systemFont(ofSize: 12)
-                peerLabel.textColor = .systemGreen
                 stack.addArrangedSubview(peerLabel)
             }
         }
@@ -506,6 +687,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let spacer = NSView()
         stack.addArrangedSubview(spacer)
         stack.setHuggingPriority(.defaultLow, for: .vertical)
+        
+        // Clipboard History
+        if !clipboardHistory.isEmpty {
+            stack.addArrangedSubview(separator())
+            stack.addArrangedSubview(label("Clipboard History", size: 10, color: .secondaryLabelColor))
+            let historyText = clipboardHistory.suffix(3).joined(separator: "\n")
+            let historyLabel = NSTextField(wrappingLabelWithString: historyText)
+            historyLabel.font = .systemFont(ofSize: 9)
+            historyLabel.textColor = .systemBlue
+            historyLabel.preferredMaxLayoutWidth = 268
+            stack.addArrangedSubview(historyLabel)
+        }
         
         // Debug Log
         if !debugLog.isEmpty {
@@ -518,6 +711,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugLabel.preferredMaxLayoutWidth = 268
             stack.addArrangedSubview(debugLabel)
         }
+    
         
         // Info
         let info = NSTextField(wrappingLabelWithString: "Clipboard syncing active. Copy on any device, paste on another!")
