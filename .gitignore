@@ -38,6 +38,13 @@ gradle-app.setting
 local.properties
 keystore.properties
 
+# Android keystores (NEVER COMMIT)
+*.keystore
+*.jks
+*.bks
+android/*.keystore
+android/*.jks
+
 # Android
 android/local.properties
 android/.gradle/

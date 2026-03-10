@@ -10,6 +10,7 @@ import java.awt.TrayIcon
 import java.awt.PopupMenu
 import java.awt.MenuItem
 import java.awt.image.BufferedImage
+import javax.imageio.ImageIO
 import kotlin.concurrent.thread
 
 fun main() = application {
@@ -97,9 +98,10 @@ fun main() = application {
             state = rememberWindowState(width = 1.dp, height = 1.dp),
             transparent = true,
             undecorated = true,
-            alwaysOnTop = false
+            alwaysOnTop = false,
+            resizable = false
         ) {
-            // Empty - just exists to keep app alive
+            // Empty - just exists to keep app alive (hidden from taskbar)
         }
     }
 
@@ -118,17 +120,38 @@ fun main() = application {
     }
 }
 
-/** Generates a simple tray icon programmatically (replace with real .ico in production). */
+/** Loads tray icon from PNG or falls back to generated icon. */
 private fun buildTrayImage(): java.awt.Image {
+    try {
+        // Try to load pre-generated tray_icon.png from resources
+        val iconPath = "tray_icon.png"
+        val iconStream = object {}.javaClass.classLoader.getResourceAsStream(iconPath)
+        if (iconStream != null) {
+            val bufferedImage = ImageIO.read(iconStream)
+            if (bufferedImage != null) {
+                println("[CrossFlow] ✓ Tray icon loaded from tray_icon.png")
+                return bufferedImage
+            }
+        }
+    } catch (e: Exception) {
+        println("[CrossFlow] ⚠️ Could not load tray icon: ${e.message}")
+    }
+    
+    // Fallback: generate simple tray icon (16x16)
+    println("[CrossFlow] Using fallback generated tray icon")
     val size = 16
-    val img  = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
-    val g    = img.createGraphics()
-    g.color  = java.awt.Color(0, 103, 192)
+    val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+    val g = img.createGraphics()
+    g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+    
+    // Material 3 Blue background
+    g.color = java.awt.Color(15, 95, 184)  // #0F5FB8
     g.fillOval(0, 0, size, size)
+    
+    // White dot in center
     g.color = java.awt.Color.WHITE
-    // Simple arrows shape
-    g.fillRect(4, 6, 8, 2)
-    g.fillRect(4, 9, 8, 2)
+    g.fillOval(6, 6, 4, 4)
+    
     g.dispose()
     return img
 }
