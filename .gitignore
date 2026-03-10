@@ -7,7 +7,7 @@ bin/
 *.jar
 *.war
 *.aar
-
+.build/
 # IDE
 .idea/
 .vscode/

@@ -12,7 +12,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "CrossFlow",
-            path: "macos"
+            path: "macos/Sources"
         )
     ]
 )
