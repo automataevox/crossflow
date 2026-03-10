@@ -69,12 +69,38 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun dynamicColorScheme(): ColorScheme {
         val darkTheme = isSystemInDarkTheme()
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (darkTheme) dynamicDarkColorScheme(this)
-            else dynamicLightColorScheme(this)
+        return if (darkTheme) {
+            // AMOLED dark theme with pure black background
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                dynamicDarkColorScheme(this).copy(
+                    background = Color.Black,
+                    surface = Color(0xFF0A0E27),
+                    surfaceDim = Color(0xFF05080F),
+                    onBackground = Color(0xFFE8EEF7),
+                    onSurface = Color(0xFFE8EEF7)
+                )
+            } else {
+                darkColorScheme(
+                    background = Color.Black,
+                    surface = Color(0xFF0A0E27),
+                    surfaceDim = Color(0xFF05080F),
+                    onBackground = Color(0xFFE8EEF7),
+                    onSurface = Color(0xFFE8EEF7),
+                    primary = Color(0xFF64B5F6),
+                    onPrimary = Color.Black,
+                    secondary = Color(0xFF81C784),
+                    onSecondary = Color.Black,
+                    tertiary = Color(0xFF4FC3F7),
+                    onTertiary = Color.Black
+                )
+            }
         } else {
-            if (darkTheme) darkColorScheme()
-            else lightColorScheme()
+            // Normal light theme
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                dynamicLightColorScheme(this)
+            } else {
+                lightColorScheme()
+            }
         }
     }
 

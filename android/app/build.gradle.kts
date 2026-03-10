@@ -9,6 +9,15 @@ android {
     namespace = "dev.crossflow.android"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../crossflow-release.keystore")
+            storePassword = "crossflow_dxvil"
+            keyAlias = "crossflow_key"
+            keyPassword = "crossflow_dxvil"
+        }
+    }
+
     defaultConfig {
         applicationId = "dev.crossflow.android"
         minSdk = 26
@@ -19,8 +28,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
