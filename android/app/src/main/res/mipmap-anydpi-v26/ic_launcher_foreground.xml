@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- Refresh icon centered -->
+  <group
+      android:translateX="54"
+      android:translateY="54">
+    <!-- Outer circle background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M0,-18 A18,18 0 0,1 12.73,-12.73 A18,18 0 0,1 18,0 A18,18 0 0,1 12.73,12.73 A18,18 0 0,1 0,18 A18,18 0 0,1 -12.73,12.73 A18,18 0 0,1 -18,0 A18,18 0 0,1 -12.73,-12.73 A18,18 0 0,1 0,-18 Z"/>
+    
+    <!-- Refresh arrows -->
+    <!-- Top arrow -->
+    <path
+        android:fillColor="#1F88E5"
+        android:pathData="M-2,-8 L2,-8 L2,-3 L6,-6 L2,-9 L2,-4 L-2,-4 Z"/>
+    
+    <!-- Bottom-right curved part -->
+    <path
+        android:fillColor="#1F88E5"
+        android:strokeColor="#1F88E5"
+        android:strokeWidth="1.5"
+        android:pathData="M-1,2 Q4,2 7,5 Q8,6.5 8,8"
+        android:fillType="evenOdd"/>
+    
+    <!-- Bottom arrow -->
+    <path
+        android:fillColor="#1F88E5"
+        android:pathData="M2,8 L-2,8 L-2,3 L-6,6 L-2,9 L-2,4 L2,4 Z"/>
+    
+    <!-- Top-left curved part -->
+    <path
+        android:fillColor="#1F88E5"
+        android:strokeColor="#1F88E5"
+        android:strokeWidth="1.5"
+        android:pathData="M1,-2 Q-4,-2 -7,-5 Q-8,-6.5 -8,-8"
+        android:fillType="evenOdd"/>
+  </group>
+</vector>

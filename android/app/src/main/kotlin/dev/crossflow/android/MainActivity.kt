@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,10 +24,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.system.exitProcess
 
 class MainActivity : ComponentActivity() {
 
@@ -53,17 +56,25 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = dynamicColorScheme()) {
-                Surface(Modifier.fillMaxSize()) { CrossFlowScreen() }
+                Surface(
+                    Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) { 
+                    CrossFlowScreen() 
+                }
             }
         }
     }
 
     @Composable
     private fun dynamicColorScheme(): ColorScheme {
+        val darkTheme = isSystemInDarkTheme()
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            dynamicLightColorScheme(this)
+            if (darkTheme) dynamicDarkColorScheme(this)
+            else dynamicLightColorScheme(this)
         } else {
-            lightColorScheme()
+            if (darkTheme) darkColorScheme()
+            else lightColorScheme()
         }
     }
 
@@ -96,15 +107,17 @@ fun CrossFlowScreen() {
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Icon(Icons.Default.SwapHoriz, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.Refresh, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp))
                         Text("CrossFlow", fontWeight = FontWeight.SemiBold)
                     }
                 },
                 actions = {
+                    // Status indicator
                     Box(
                         modifier = Modifier
-                            .padding(end = 16.dp)
+                            .padding(end = 12.dp)
                             .size(10.dp)
                             .clip(CircleShape)
                             .background(
@@ -131,7 +144,7 @@ fun CrossFlowScreen() {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = androidx.compose.ui.graphics.Color(0xFFE3F2FD)
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     )
                 ) {
                     Row(
@@ -144,7 +157,7 @@ fun CrossFlowScreen() {
                         Icon(
                             Icons.Default.CloudDone,
                             contentDescription = null,
-                            tint = androidx.compose.ui.graphics.Color(0xFF1976D2),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Column(modifier = Modifier.weight(1f)) {
@@ -152,22 +165,22 @@ fun CrossFlowScreen() {
                                 "Passive Clipboard Sharing",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
-                                color = androidx.compose.ui.graphics.Color(0xFF1976D2)
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
                                 if (running) "Active • Clipboard syncing in background without app open"
                                 else "Inactive • Start the service to enable background sync",
                                 fontSize = 11.sp,
-                                color = androidx.compose.ui.graphics.Color(0xFF0D47A1)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Icon(
                             if (running) Icons.Default.CheckCircle else Icons.Default.Error,
                             contentDescription = null,
                             tint = if (running)
-                                androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                                MaterialTheme.colorScheme.tertiary
                             else
-                                androidx.compose.ui.graphics.Color(0xFFFF9800),
+                                MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -181,7 +194,7 @@ fun CrossFlowScreen() {
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = androidx.compose.ui.graphics.Color(0xFF4CAF50))
+                            tint = MaterialTheme.colorScheme.tertiary)
                         Text("Connected devices",
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp)
@@ -206,7 +219,7 @@ fun CrossFlowScreen() {
                         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(Icons.Default.Cancel, contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = androidx.compose.ui.graphics.Color(0xFFFF9800))
+                            tint = MaterialTheme.colorScheme.error)
                         Text("Disconnected devices",
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp)
@@ -255,7 +268,7 @@ fun CrossFlowScreen() {
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = androidx.compose.ui.graphics.Color(0xFFD32F2F)
+                        containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
                     Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -274,7 +287,6 @@ private fun AndroidDeviceCard(
     isExpanded: Boolean,
     onToggleExpand: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val deviceInfo = ClipboardSyncService.getDeviceInfo(name)
     
     Card(
@@ -283,9 +295,9 @@ private fun AndroidDeviceCard(
             .clickable { onToggleExpand() },
         colors = CardDefaults.cardColors(
             containerColor = if (isConnected)
-                androidx.compose.ui.graphics.Color(0xFFE8F5E9)
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
             else
-                androidx.compose.ui.graphics.Color(0xFFFFF3E0)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
         )
     ) {
         Column {
@@ -301,9 +313,9 @@ private fun AndroidDeviceCard(
                     Icons.Default.Computer,
                     contentDescription = null,
                     tint = if (isConnected)
-                        androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                        MaterialTheme.colorScheme.tertiary
                     else
-                        androidx.compose.ui.graphics.Color(0xFFFF9800),
+                        MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
                 Column(modifier = Modifier.weight(1f)) {
@@ -315,9 +327,9 @@ private fun AndroidDeviceCard(
                     Text(
                         if (isConnected) "Connected" else "Offline",
                         color = if (isConnected)
-                            androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                            MaterialTheme.colorScheme.tertiary
                         else
-                            androidx.compose.ui.graphics.Color(0xFFFF9800),
+                            MaterialTheme.colorScheme.error,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -331,12 +343,12 @@ private fun AndroidDeviceCard(
 
             // Expandable logs section
             if (isExpanded && deviceInfo != null) {
-                Divider(modifier = Modifier.padding(horizontal = 12.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp),
-                    color = androidx.compose.ui.graphics.Color.White,
+                    color = MaterialTheme.colorScheme.surface,
                     shape = MaterialTheme.shapes.small
                 ) {
                     // Create a snapshot copy to avoid concurrent modification
@@ -351,7 +363,7 @@ private fun AndroidDeviceCard(
                             "No logs yet",
                             modifier = Modifier.padding(10.dp),
                             fontSize = 11.sp,
-                            color = androidx.compose.ui.graphics.Color(0xFF999999)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
                         Column(
@@ -364,7 +376,7 @@ private fun AndroidDeviceCard(
                                     logEntry,
                                     modifier = Modifier.padding(vertical = 2.dp),
                                     fontSize = 10.sp,
-                                    color = androidx.compose.ui.graphics.Color(0xFF333333),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
